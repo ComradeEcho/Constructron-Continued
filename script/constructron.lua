@@ -342,7 +342,7 @@ ctron.conditions = {
                     local area = chunk_util.get_area_from_position(constructron.position, cell.construction_radius)
                     local ghosts = constructron.surface.find_entities_filtered {
                         area = area,
-                        name = {"entity-ghost", "tile-ghost"},
+                        name = {"entity-ghost", "tile-ghost", "item-request-proxy"},
                         force = constructron.force.name
                     }
                     for _, entity in pairs(ghosts) do
