@@ -568,7 +568,18 @@ ctron.conditions = {
                     end
                 end
             end
-            return false -- condition is not met
+            debug_lib.VisualDebugText("Waiting for items: " .. 3600 - ticks, constructron, -0.5, 1)
+            if (ticks > 3600) then
+                for i = 1, constructron.request_slot_count do ---@cast i uint
+                    local request = constructron.get_vehicle_logistic_slot(i)
+                    if request and (trunk[global.desired_robot_name] >= global.desired_robot_count) and (request.name ~= global.desired_robot_name) and ((trunk[request.name] or 0) > 0) or table_size(trunk) > 1 then
+                        for i = 1, constructron.request_slot_count do --[[@cast i uint]]
+                            constructron.clear_vehicle_logistic_slot(i)
+                        end
+                    end
+                end
+            end
+            return false
         end
         -- clear logistic request and proceed with job
         for i = 1, constructron.request_slot_count do --[[@cast i uint]]
