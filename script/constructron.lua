@@ -329,42 +329,61 @@ ctron.conditions = {
     build_done = function(job)
         local constructron = job.constructron
         debug_lib.VisualDebugText("Constructing", constructron, -1, 1)
+
         local build_tick = ctron.get_constructron_status(constructron, 'build_tick')
         local game_tick = game.tick
-        if (game_tick - build_tick) > 119 then
-            if constructron.logistic_cell then
-                local logistic_network = constructron.logistic_cell.logistic_network
-                if next(logistic_network.construction_robots) then
+        if (game_tick - build_tick) <= 119 then
+            return false -- not enough time (two seconds) since last check
+        end
+
+        if ( game_tick - job.start_tick) > 54000 then -- 15 minutes
+            debug_lib.VisualDebugText("Job wrapup: Timeout", constructron, -1, 5)
+            ctron.graceful_wrapup(job)
+            return false
+        end
+
+        if not constructron.logistic_cell then
+            ctron.graceful_wrapup(job) -- missing roboports. return to station
+            return false
+        end
+
+        local logistic_network = constructron.logistic_cell.logistic_network
+        for a, b in pairs(logistic_network.construction_robots) do
+            game.print(serpent.block(b))
+        end
+
+        if logistic_network and next(logistic_network.construction_robots) then
+            ctron.set_constructron_status(constructron, 'build_tick', game.tick)
+            return false -- robots are active
+        end
+
+        local cell = constructron.logistic_cell
+        local area = chunk_util.get_area_from_position(constructron.position, cell.construction_radius)
+        local ghosts = constructron.surface.find_entities_filtered {
+                area = area,
+                name = {"entity-ghost", "tile-ghost"},
+                force = constructron.force.name}
+        game.print("checking ghosts")
+        for _, entity in pairs(ghosts) do
+            -- is the entity in range?
+            if cell.is_in_construction_range(entity.position) then
+                -- can the entity be built?
+                local item = entity.ghost_prototype.items_to_place_this[1]
+                if logistic_network and logistic_network.can_satisfy_request(item.name, (item.count or 1)) and
+                    constructron.surface.can_place_entity({ --check that the entity isn't blocked by large out-of-range entities
+                        name = entity.name,
+                        position = entity.position,
+                        force = constructron.force.name,
+                        inner_name = entity.ghost_name,
+                        build_check_type = defines.build_check_type.manual}) then
+                    -- construction not yet complete
                     ctron.set_constructron_status(constructron, 'build_tick', game.tick)
-                    return false -- robots are active
-                else
-                    local cell = constructron.logistic_cell
-                    local area = chunk_util.get_area_from_position(constructron.position, cell.construction_radius)
-                    local ghosts = constructron.surface.find_entities_filtered {
-                        area = area,
-                        name = {"entity-ghost", "tile-ghost"},
-                        force = constructron.force.name
-                    }
-                    for _, entity in pairs(ghosts) do
-                        -- is the entity in range?
-                        if cell.is_in_construction_range(entity.position) then
-                            -- can the entity be built?
-                            local item = entity.ghost_prototype.items_to_place_this[1]
-                            if logistic_network.can_satisfy_request(item.name, (item.count or 1)) then
-                                -- construction not yet complete
-                                ctron.set_constructron_status(constructron, 'build_tick', game.tick)
-                                return false
-                            end
-                        end
-                    end
+                    return false
                 end
-                return true -- condition is satisfied
-            else
-                ctron.graceful_wrapup(job) -- missing roboports.. leave
-                return false
             end
         end
-        return false
+        return true -- condition is satisfied
+
     end,
     -------------------------------------------------------------------------------
     ---@param job Job
@@ -377,7 +396,7 @@ ctron.conditions = {
         if (game_tick - decon_tick) > 119 then
             if constructron.logistic_cell then
                 local logistic_network = constructron.logistic_cell.logistic_network
-                if next(logistic_network.construction_robots) then
+                if logistic_network and next(logistic_network.construction_robots) then
                     local empty_stacks = 0
                     local inventory = constructron.get_inventory(defines.inventory.spider_trunk)
                     empty_stacks = empty_stacks + (inventory.count_empty_stacks())
@@ -469,6 +488,16 @@ ctron.conditions = {
         local surface_index = constructron.surface.index
         local logistic_condition = true
         debug_lib.VisualDebugText("Awaiting logistics", constructron, -1, 1)
+
+        --if constructron is moving then inhibit movement bonus
+        if not constructron.grid.inhibit_movement_bonus and constructron.speed then
+            constructron.grid.inhibit_movement_bonus = true
+        else
+            constructron.grid.inhibit_movement_bonus = false
+        end
+
+        
+
         -- check status of logistic requests
         local trunk_inventory = constructron.get_inventory(defines.inventory.spider_trunk)
         local trunk = {} -- what we have
