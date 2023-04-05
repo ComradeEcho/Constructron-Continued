@@ -108,60 +108,42 @@ ctron.actions = {
     ---@param job Job
     clear_items = function(job)
         local constructron = job.constructron
-        -- for when the constructron returns to service station and needs to empty it's inventory.
-        local slot = 1
-        local desired_robot_count = global.desired_robot_count
-        local desired_robot_name = global.desired_robot_name
         local inventory = constructron.get_inventory(defines.inventory.spider_trunk)
         local filtered_items = {}
         local robot_count = 0
+        local slot = 1
+        local desired_robot_count = global.desired_robot_count
+        local desired_robot_name = global.desired_robot_name
+        local clear_robots_when_idle = global.clear_robots_when_idle
+    
+        local function setLogisticSlot(item, min, max)
+            constructron.set_vehicle_logistic_slot(slot, {
+                name = item.name,
+                min = min,
+                max = max
+            })
+            slot = slot + 1
+            filtered_items[item.name] = true
+        end
+    
         for i = 1, #inventory do
             local item = inventory[i]
             if item.valid_for_read then
-                if not global.clear_robots_when_idle then
-                    if not (item.prototype.place_result and item.prototype.place_result.type == "construction-robot") then
-                        if not filtered_items[item.name] then
-                            constructron.set_vehicle_logistic_slot(slot, {
-                                name = item.name,
-                                min = 0,
-                                max = 0
-                            })
-                            slot = slot + 1
-                            filtered_items[item.name] = true
-                        end
-                    else
-                        robot_count = robot_count + item.count
-                        if robot_count > desired_robot_count then
-                            if not filtered_items[item.name] then
-                                if item.name == desired_robot_name then
-                                    constructron.set_vehicle_logistic_slot(slot, {
-                                        name = item.name,
-                                        min = desired_robot_count --[[@as uint]],
-                                        max = desired_robot_count --[[@as uint]]
-                                    })
-                                else
-                                    constructron.set_vehicle_logistic_slot(slot, {
-                                        name = item.name,
-                                        min = 0,
-                                        max = 0
-                                    })
-                                end
-                                slot = slot + 1
-                                filtered_items[item.name] = true
-                            end
-                        end
+                if not (item.prototype.place_result and item.prototype.place_result.type == "construction-robot") then
+                    if not filtered_items[item.name] then
+                        setLogisticSlot(item, 0, 0)
                     end
                 else
-                    if not filtered_items[item.name] then
-                        constructron.set_vehicle_logistic_slot(slot, {
-                            name = item.name,
-                            min = 0,
-                            max = 0
-                        })
-                        slot = slot + 1
-                        filtered_items[item.name] = true
+                    robot_count = robot_count + item.count
+                    if robot_count > desired_robot_count then
+                        local min = item.name == desired_robot_name and desired_robot_count or 0
+                        if not filtered_items[item.name] then
+                            setLogisticSlot(item, min, desired_robot_count)
+                        end
                     end
                 end
+            elseif clear_robots_when_idle and not filtered_items[item.name] then
+                setLogisticSlot(item, 0, 0)
             end
         end
     end,
