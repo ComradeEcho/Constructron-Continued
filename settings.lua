@@ -19,6 +19,13 @@ data:extend({
         maximum_value = 600
     }, {
         type = "int-setting",
+        name = "logistics_timeout",
+        setting_type = "runtime-global",
+        default_value = 0,
+        minimum_value = 0,
+        maximum_value = 600
+    }, {
+        type = "int-setting",
         name = "desired_robot_count",
         setting_type = "runtime-global",
         default_value = 50,

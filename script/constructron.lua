@@ -601,8 +601,8 @@ ctron.conditions = {
                     end
                 end
             end
-            debug_lib.VisualDebugText("Waiting for items: " .. global.logistics_timeout - ticks, constructron, -0.5, 1)
-            if (ticks > global.logistics_timeout) then
+            if (global.logistics_timeout > 0 and ticks > global.logistics_timeout) then
+                debug_lib.VisualDebugText("Waiting for items: " .. global.logistics_timeout - ticks, constructron, -0.5, 1)
                 for i = 1, constructron.request_slot_count do ---@cast i uint
                     local request = constructron.get_vehicle_logistic_slot(i)
                     if request

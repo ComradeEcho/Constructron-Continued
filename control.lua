@@ -137,6 +137,7 @@ local ensure_globals = function()
     global.repair_job_toggle = settings.global["repair_jobs"].value
     global.debug_toggle = settings.global["constructron-debug-enabled"].value
     global.job_start_delay = (settings.global["job-start-delay"].value * 60)
+    global.logistics_timeout = (settings.global["logistics_timeout"].value * 60 * 60)
     global.desired_robot_count = settings.global["desired_robot_count"].value
     global.desired_robot_name = settings.global["desired_robot_name"].value
     global.entities_per_tick = settings.global["entities_per_tick"].value --[[@as uint]]
@@ -207,6 +208,8 @@ script.on_event(ev.on_runtime_mod_setting_changed, function(event)
         global.debug_toggle = settings.global["constructron-debug-enabled"].value
     elseif setting == "job-start-delay" then
         global.job_start_delay = (settings.global["job-start-delay"].value * 60)
+    elseif setting == "logistics_timeout" then
+        global.logistics_timeout = (settings.global["logistics_timeout"].value * 60 * 60)
     elseif setting == "desired_robot_count" then
         global.desired_robot_count = settings.global["desired_robot_count"].value
     elseif setting == "desired_robot_name" then
