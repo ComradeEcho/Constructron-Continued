@@ -329,11 +329,6 @@ ctron.conditions = {
             return false
         end
 
-        local logistic_network = constructron.logistic_cell.logistic_network
-        for a, b in pairs(logistic_network.construction_robots) do
-            game.print(serpent.block(b))
-        end
-
         if logistic_network and next(logistic_network.construction_robots) then
             ctron.set_constructron_status(constructron, 'build_tick', game.tick)
             return false -- robots are active
@@ -345,7 +340,6 @@ ctron.conditions = {
                 area = area,
                 name = {"entity-ghost", "tile-ghost"},
                 force = constructron.force.name}
-        game.print("checking ghosts")
         for _, entity in pairs(ghosts) do
             -- is the entity in range?
             if cell.is_in_construction_range(entity.position) then
@@ -365,7 +359,6 @@ ctron.conditions = {
             end
         end
         return true -- condition is satisfied
-
     end,
     -------------------------------------------------------------------------------
     ---@param job Job
@@ -470,16 +463,6 @@ ctron.conditions = {
         local surface_index = constructron.surface.index
         local logistic_condition = true
         debug_lib.VisualDebugText("Awaiting logistics", constructron, -1, 1)
-
-        --if constructron is moving then inhibit movement bonus
-        if not constructron.grid.inhibit_movement_bonus and constructron.speed then
-            constructron.grid.inhibit_movement_bonus = true
-        else
-            constructron.grid.inhibit_movement_bonus = false
-        end
-
-        
-
         -- check status of logistic requests
         local trunk_inventory = constructron.get_inventory(defines.inventory.spider_trunk)
         local trunk = {} -- what we have
