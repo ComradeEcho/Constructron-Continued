@@ -461,8 +461,11 @@ ctron.conditions = {
         local constructron = job.constructron
         local ticks = (game.tick - job.start_tick)
         local surface_index = constructron.surface.index
-        local logistic_condition = true
+        local logistics_fufilled = true
         debug_lib.VisualDebugText("Awaiting logistics", constructron, -1, 1)
+
+
+
         -- check status of logistic requests
         local trunk_inventory = constructron.get_inventory(defines.inventory.spider_trunk)
         local trunk = {} -- what we have
@@ -472,92 +475,128 @@ ctron.conditions = {
                 trunk[item.name] = (trunk[item.name] or 0) + item.count
             end
         end
+
         -- ensure that what we do not want has been taken
         local trash_inventory = constructron.get_inventory(defines.inventory.spider_trash)
         if trash_inventory then
             local trash_items = trash_inventory.get_contents()
-            if next(trash_items) then
+            local item = next(trash_items)
+
+            if item then
                 logistic_condition = false
             end
+
+            local logistic_network = ctron.get_closest_service_station(constructron).logistic_network
+            if item and not logistic_network.select_drop_point { stack = item } then --check if there's no storage for the item
+                local surface_stations = ctron.get_service_stations(surface_index)
+                for _, station in pairs(surface_stations) do
+                    -- find a station that can take the item
+                    if station.valid and station.logistic_network and station.logistic_network.select_drop_point { stack =
+                        item } then
+                        job.request_station = station
+                        new_station = station
+                    end
+                end
+                if new_station then
+                    ctron.move_to(job, new_station.position)
+                    job.start_tick = game.tick
+                    debug_lib.VisualDebugText("Trying a different station", constructron, -0.5, 5)
+                end
+                return false
+            end
         end
+
         -- ensure what we are asking for has been delivered
         for i = 1, constructron.request_slot_count do ---@cast i uint
             local request = constructron.get_vehicle_logistic_slot(i)
             if request then
                 if not (((trunk[request.name] or 0) >= request.min) and ((trunk[request.name] or 0) <= request.max)) then
-                    logistic_condition = false
+                    logistics_fufilled = false
                 else
                     constructron.clear_vehicle_logistic_slot(i)
                 end
             end
         end
-        if not logistic_condition then
-            if not (job.action == "clear_items") then
-                -- station roaming
-                if (ticks > 900) then
-                    local new_station
-                    -- check if current station no longer exists
-                    if not job.request_station or not job.request_station.valid then
-                        new_station = ctron.get_closest_service_station(job.constructron)
-                        if new_station then
-                            table.insert(global.job_bundles[job.bundle_index], 1, {
-                                action = 'go_to_position',
-                                action_args = {new_station.position},
-                                leave_condition = 'position_done',
-                                leave_args = {new_station.position},
-                                constructron = constructron,
-                                bundle_index = job.bundle_index
-                            })
-                            job.request_station = new_station
-                        end
-                        return false
-                    end
-                    if (global.stations_count[(surface_index)] > 1) then
-                        -- check if current network can provide
-                        for i = 1, constructron.request_slot_count do ---@cast i uint
-                            local request = constructron.get_vehicle_logistic_slot(i)
-                            if request and request.name then
-                                local logistic_network = job.request_station.logistic_network
-                                if logistic_network and logistic_network.can_satisfy_request(request.name, request.min, true) then
-                                    if not (logistic_network.all_logistic_robots <= 0) then
-                                        return false -- items are expected to be delivered
-                                    else
-                                        debug_lib.VisualDebugText("No logistic robots in network", constructron, -0.5, 3)
-                                        return false
-                                    end
-                                end
-                            end
-                        end
-                        -- check if other stations can provide
-                        local surface_stations = ctron.get_service_stations(surface_index)
-                        for _, station in pairs(surface_stations) do
-                            for i = 1, constructron.request_slot_count do ---@cast i uint
-                                local request = constructron.get_vehicle_logistic_slot(i)
-                                if request and request.name then
-                                    local logistic_network = station.logistic_network
-                                    if logistic_network and logistic_network.can_satisfy_request(request.name, request.min, true) then
-                                        job.request_station = station
-                                        new_station = station
-                                    end
-                                end
+
+        if logistics_fufilled then
+            -- clear logistic request and proceed with job
+            for i = 1, constructron.request_slot_count do --[[@cast i uint]]
+                constructron.clear_vehicle_logistic_slot(i)
+            end
+            return true
+        end
+
+        --logistics not fufilled yet
+        if job.action == "clear_items" then
+            return false
+        end
+
+        -- station roaming
+        if (ticks > 900) then
+            local new_station
+            -- check if current station no longer exists
+            if not job.request_station or not job.request_station.valid then
+                new_station = ctron.get_closest_service_station(job.constructron)
+                if new_station then
+                    ctron.move_to(job, new_station.position)
+                end
+                return false
+            end
+            if (global.stations_count[(surface_index)] > 1) then
+                -- check if current network can provide
+                for i = 1, constructron.request_slot_count do ---@cast i uint
+                    local request = constructron.get_vehicle_logistic_slot(i)
+                    if request and request.name then
+                        local logistic_network = job.request_station.logistic_network
+                        if logistic_network and logistic_network.can_satisfy_request(request.name, request.min, true) then
+                            if not (logistic_network.all_logistic_robots <= 0) then
+                                return false     -- items are expected to be delivered
+                            else
+                                debug_lib.VisualDebugText("No logistic robots in network", constructron, -0.5, 3)
+                                return false
                             end
                         end
                     end
-                    -- roam to station if there is a better one
-                    if new_station then
-                        table.insert(global.job_bundles[job.bundle_index], 1, {
-                            action = 'go_to_position',
-                            action_args = {new_station.position},
-                            leave_condition = 'position_done',
-                            leave_args = {new_station.position},
-                            constructron = constructron,
-                            bundle_index = job.bundle_index
-                        })
-                        job.start_tick = game.tick
-                        debug_lib.VisualDebugText("Trying a different station", constructron, -0.5, 5)
-                    else -- alert
-                        for _, player in pairs(game.players) do
-                            player.add_alert(constructron, defines.alert_type.no_material_for_construction)
+                end
+                -- check if other stations can provide
+                local surface_stations = ctron.get_service_stations(surface_index)
+                for _, station in pairs(surface_stations) do
+                    for i = 1, constructron.request_slot_count do ---@cast i uint
+                        local request = constructron.get_vehicle_logistic_slot(i)
+                        if request and request.name then
+                            local logistic_network = station.logistic_network
+                            if logistic_network and logistic_network.can_satisfy_request(request.name, request.min, true) then
+                                job.request_station = station
+                                new_station = station
+                            end
+                        end
+                    end
+                end
+            end
+            -- roam to station if there is a better one
+            if new_station then
+                ctron.move_to(job, new_station.position)
+                debug_lib.VisualDebugText("Trying a different station", constructron, -0.5, 5)
+            else     -- alert
+                for _, player in pairs(game.players) do
+                    player.add_alert(constructron, defines.alert_type.no_material_for_construction)
+                end
+            end
+
+
+
+
+            debug_lib.VisualDebugText("Waiting for items: " .. 3600 - ticks, constructron, -0.5, 1)
+            if (ticks > 3600) then
+                for i = 1, constructron.request_slot_count do ---@cast i uint
+                    local request = constructron.get_vehicle_logistic_slot(i)
+                    if request
+                            and (trunk[global.desired_robot_name] >= global.desired_robot_count) 
+                            and (request.name ~= global.desired_robot_name) 
+                            and ((trunk[request.name] or 0) > 0) 
+                            or table_size(trunk) > 1 then
+                        for i = 1, constructron.request_slot_count do --[[@cast i uint]]
+                            constructron.clear_vehicle_logistic_slot(i)
                         end
                     end
                 end
@@ -579,11 +618,7 @@ ctron.conditions = {
             end
             return false
         end
-        -- clear logistic request and proceed with job
-        for i = 1, constructron.request_slot_count do --[[@cast i uint]]
-            constructron.clear_vehicle_logistic_slot(i)
-        end
-        return true -- condition is satisfied
+        return false
     end,
     -------------------------------------------------------------------------------
     ---@return boolean
@@ -675,6 +710,18 @@ ctron.enable_roboports = function(grid) -- doesn't really enable roboports, it r
             ctron.replace_roboports(grid, eq, eq.prototype.take_result.name)
         end
     end
+end
+
+ctron.move_to = function(job, position)
+    table.insert(global.job_bundles[job.bundle_index], 1, {
+        action = 'go_to_position',
+        action_args = { position },
+        leave_condition = 'position_done',
+        leave_args = { position },
+        constructron = job.constructron,
+        bundle_index = job.bundle_index
+    })
+    job.start_tick = game.tick
 end
 
 ---@param constructron LuaEntity
