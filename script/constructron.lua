@@ -107,14 +107,14 @@ ctron.actions = {
     -------------------------------------------------------------------------------
     ---@param job Job
     clear_items = function(job)
-        local constructron = job.constructron
-        local inventory = constructron.get_inventory(defines.inventory.spider_trunk)
-        local filtered_items = {}
-        local robot_count = 0
         local slot = 1
         local desired_robot_count = global.desired_robot_count
         local desired_robot_name = global.desired_robot_name
         local clear_robots_when_idle = global.clear_robots_when_idle
+        local constructron = job.constructron
+        local inventory = constructron.get_inventory(defines.inventory.spider_trunk)
+        local filtered_items = {}
+        local robot_count = 0
     
         local function setLogisticSlot(item, min, max)
             constructron.set_vehicle_logistic_slot(slot, {
@@ -601,8 +601,8 @@ ctron.conditions = {
                     end
                 end
             end
-            debug_lib.VisualDebugText("Waiting for items: " .. 3600 - ticks, constructron, -0.5, 1)
-            if (ticks > 3600) then
+            debug_lib.VisualDebugText("Waiting for items: " .. global.logistics_timeout - ticks, constructron, -0.5, 1)
+            if (ticks > global.logistics_timeout) then
                 for i = 1, constructron.request_slot_count do ---@cast i uint
                     local request = constructron.get_vehicle_logistic_slot(i)
                     if request
