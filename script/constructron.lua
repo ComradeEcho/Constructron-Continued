@@ -591,7 +591,7 @@ ctron.conditions = {
                 for i = 1, constructron.request_slot_count do ---@cast i uint
                     local request = constructron.get_vehicle_logistic_slot(i)
                     if request
-                            and (trunk[global.desired_robot_name] >= global.desired_robot_count) 
+                            and (trunk[global.desired_robot_name] or 0 >= global.desired_robot_count) 
                             and (request.name ~= global.desired_robot_name) 
                             and ((trunk[request.name] or 0) > 0) 
                             or table_size(trunk) > 1 then
@@ -606,7 +606,7 @@ ctron.conditions = {
                 for i = 1, constructron.request_slot_count do ---@cast i uint
                     local request = constructron.get_vehicle_logistic_slot(i)
                     if request
-                            and (trunk[global.desired_robot_name] >= global.desired_robot_count) 
+                            and (trunk[global.desired_robot_name] or 0 >= global.desired_robot_count) 
                             and (request.name ~= global.desired_robot_name) 
                             and ((trunk[request.name] or 0) > 0) 
                             or table_size(trunk) > 1 then
